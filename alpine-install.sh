@@ -82,7 +82,7 @@ instances:
     log:
       level: info
       output: stdout
-    health_port: 65531
+    health_port: 59999
     nodes:
       - node_id: ${NODE_ID}
 CONF_EOF
