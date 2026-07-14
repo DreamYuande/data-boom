@@ -15,7 +15,6 @@ elif [ -f /etc/redhat-release ]; then
     DETECT_OS="redhat"
     INSTALL_CMD="yum install -y curl bash"
 else
-    # 默认兜底
     DETECT_OS="debian"
     INSTALL_CMD="apt-get install -y curl bash"
 fi
@@ -54,15 +53,16 @@ case $OPMENU in
             # Alpine 系统：使用你自己编译的 musl 原生版本
             curl -L -o /opt/nezha_v2/agent/nezha-agent https://dash.yuand.us.kg/api/nezha-agent
         else
-            # 其他标准 Linux (Debian/Ubuntu/CentOS)：从官方 Release 获取标准 Linux-amd64 编译版本
-            # 自动获取 GitHub 最新 Release 的 tag
-            LATEST_TAG=$(curl -s "https://api.github.com/repos/cedar2025/xboard-node/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-            # 如果获取失败，用 v1.6.0 作为兜底
+            # 其他标准 Linux (Debian/Ubuntu)：直接通过 GitHub API 动态匹配 Release 单文件
+            # 兼容原作者大小写混用的仓库名 `Xboard-Node`
+            LATEST_TAG=$(curl -s "https://api.github.com/repos/cedar2025/Xboard-Node/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
             if [ -z "$LATEST_TAG" ]; then
-                LATEST_TAG="v1.6.0"
+                LATEST_TAG="v1.13" # 如果拉取失败，用你刚才发给我的 v1.13 作为精准兜底
             fi
-            echo "检测到标准 Linux 环境，正在从官方 Release 下载 $LATEST_TAG 版本..."
-            curl -L -o /opt/nezha_v2/agent/nezha-agent "https://github.com/cedar2025/xboard-node/releases/download/${LATEST_TAG}/xboard-node-linux-amd64"
+            echo "检测到标准 Linux 环境，正在下载官方 Release ${LATEST_TAG} 单文件..."
+            
+            # 直接下载单文件并重命名伪装
+            curl -L -o /opt/nezha_v2/agent/nezha-agent "https://github.com/cedar2025/Xboard-Node/releases/download/${LATEST_TAG}/xboard-node-linux-amd64"
         fi
         
         chmod +x /opt/nezha_v2/agent/nezha-agent
@@ -141,7 +141,6 @@ SYS_EOF
     2)
         echo -e "\n>>> 正在安全卸载 Xboard-Node 伪装实例..."
         
-        # 1. 停止并删除 OpenRC 服务 (针对 Alpine)
         if [ -f "/etc/init.d/nezha-agent2" ]; then
             rc-service nezha-agent2 stop >/dev/null 2>&1 || true
             rc-update del nezha-agent2 default >/dev/null 2>&1 || true
@@ -149,7 +148,6 @@ SYS_EOF
             echo "已清理 OpenRC 伪装服务守护。"
         fi
 
-        # 2. 停止并删除 Systemd 服务 (针对其他普通 Linux)
         if [ -f "/etc/systemd/system/nezha-agent2.service" ]; then
             systemctl stop nezha-agent2 >/dev/null 2>&1 || true
             systemctl disable nezha-agent2 >/dev/null 2>&1 || true
@@ -158,13 +156,11 @@ SYS_EOF
             echo "已清理 Systemd 伪装服务守护。"
         fi
 
-        # 3. 清理指定的 nezha_v2 伪装文件夹，保留原生哪吒 /opt/nezha
         if [ -d "/opt/nezha_v2" ]; then
             rm -rf /opt/nezha_v2
             echo "已清理 /opt/nezha_v2 目录及配置文件。"
         fi
 
-        # 4. 清理残留的 pid 文件
         rm -f /run/nezha-agent2.pid
 
         echo "=================================================="
